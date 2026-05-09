@@ -1,6 +1,8 @@
 # Combat Log - Xenonauts 2 mod
 
-A QoL mod for [Xenonauts 2](https://store.steampowered.com/app/538030/Xenonauts_2/). Adds a combat log showing detailed information about combat actions.
+A QoL mod for [Xenonauts 2](https://store.steampowered.com/app/538030/Xenonauts_2/). 
+
+Adds an expandable combat log at the bottom left of the screen showing more more information (like rolls, damage) about combat actions.
 
 ## Install
 
@@ -12,7 +14,9 @@ A QoL mod for [Xenonauts 2](https://store.steampowered.com/app/538030/Xenonauts_
 
 ## Screenshots
 
+<img width="784" height="394" alt="Screenshot_20260509_151717-2" src="https://github.com/user-attachments/assets/1d4deb54-ac59-45d1-8134-76acf1be1355" />
 
+https://github.com/user-attachments/assets/1f49e0e4-1019-499a-8399-02adcdab873c
 
 ## Build from source
 
