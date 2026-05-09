@@ -30,6 +30,9 @@ namespace CombatLog.Runtime
             if (attacker == null || target == null)
                 return;
             var roll = ev.Projectile != null ? (int?)Math.Round(ev.Projectile.Roll) : null;
+            // Per-shot chance = TrueChanceToHit * CalculateRecoilModifierForBurst(index).
+            // Each shot in a burst rolls against its own degraded accuracy.
+            var chance = ev.Projectile != null ? (int?)Math.Round(ev.Projectile.Accuracy) : null;
             // ProjectileImpactReport fires whenever the projectile hits ANYTHING (target,
             // intervening cover, ground via trajectory). Only RollHitOriginalTarget counts as
             // a real hit on the intended target for the [Ability] color; otherwise grey it.
@@ -43,7 +46,7 @@ namespace CombatLog.Runtime
                         .Projectile
                         .Status
                         .RollHitOriginalTarget;
-            var head = FormatHead(conflict, attacker, roll, hit: hitTheTarget);
+            var head = FormatHead(conflict, attacker, roll, chance, hit: hitTheTarget);
             var state = new ImpactState(target, head);
             _pending[ev] = state;
             CombatLogFeed.Publish(new CombatEntry(EntryKind.Hit, BuildLine(state), mergeKey: ev));
@@ -60,8 +63,12 @@ namespace CombatLog.Runtime
             if (attacker == null || target == null)
                 return;
             var roll = ev!.Projectile != null ? (int?)Math.Round(ev.Projectile.Roll) : null;
+            var chance = ev.Projectile != null ? (int?)Math.Round(ev.Projectile.Accuracy) : null;
             CombatLogFeed.Publish(
-                new CombatEntry(EntryKind.Miss, FormatMissLine(conflict, attacker, target, roll))
+                new CombatEntry(
+                    EntryKind.Miss,
+                    FormatMissLine(conflict, attacker, target, roll, chance)
+                )
             );
         }
 
@@ -78,7 +85,7 @@ namespace CombatLog.Runtime
             if (attacker == null || target == null)
                 return;
             // Melee's d100 is local to MeleeAbility.HitTarget and not stored on the event.
-            var head = FormatHead(conflict, attacker, roll: null, hit: true);
+            var head = FormatHead(conflict, attacker, roll: null, chance: null, hit: true);
             var state = new ImpactState(target, head);
             _pending[ev] = state;
             CombatLogFeed.Publish(new CombatEntry(EntryKind.Hit, BuildLine(state), mergeKey: ev));
@@ -95,7 +102,10 @@ namespace CombatLog.Runtime
             if (attacker == null || target == null)
                 return;
             CombatLogFeed.Publish(
-                new CombatEntry(EntryKind.Miss, FormatMissLine(conflict, attacker, target, null))
+                new CombatEntry(
+                    EntryKind.Miss,
+                    FormatMissLine(conflict, attacker, target, roll: null, chance: null)
+                )
             );
         }
 
@@ -236,7 +246,13 @@ namespace CombatLog.Runtime
         }
 
         // Just the attacker + ability + roll-vs-chance prefix.
-        private string FormatHead(BaseConflict conflict, Entity attacker, int? roll, bool hit)
+        private string FormatHead(
+            BaseConflict conflict,
+            Entity attacker,
+            int? roll,
+            int? chance,
+            bool hit
+        )
         {
             var aColor = ColorFor(attacker);
             var ability = AbilityName(conflict);
@@ -245,10 +261,10 @@ namespace CombatLog.Runtime
             var abilitySuffix =
                 ability != null ? $" <color={abilityColor}>[{ability}]</color>" : "";
 
-            var chance = (int)Math.Round(conflict.RoundedTrueChanceToHit);
+            var effectiveChance = chance ?? (int)Math.Round(conflict.RoundedTrueChanceToHit);
             var rollText = roll.HasValue
-                ? $"<color={MetaColor}>({roll.Value} vs {chance})</color>"
-                : $"<color={MetaColor}>({chance}%)</color>";
+                ? $"<color={MetaColor}>({roll.Value} vs {effectiveChance})</color>"
+                : $"<color={MetaColor}>({effectiveChance}%)</color>";
 
             return $"<color={aColor}>{NameOf(attacker)}</color>{abilitySuffix} {rollText}";
         }
@@ -258,10 +274,11 @@ namespace CombatLog.Runtime
             BaseConflict conflict,
             Entity attacker,
             Entity target,
-            int? roll
+            int? roll,
+            int? chance
         )
         {
-            var head = FormatHead(conflict, attacker, roll, hit: false);
+            var head = FormatHead(conflict, attacker, roll, chance, hit: false);
             var span = TargetSpan(target);
             return span != null ? $"{head} <color={MetaColor}>{Bullet}</color> {span}" : head;
         }

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using Xenonauts.Screens.LoadingScreen;
 
 namespace CombatLog.Runtime
 {
@@ -41,6 +42,10 @@ namespace CombatLog.Runtime
         private static Texture2D? _panelTex;
         private static Texture2D? _borderTex;
 
+        private LoadingScreenBehavior? _loadingScreen;
+        private float _nextLoadingScreenLookupAt;
+        private const float LoadingScreenLookupCooldown = 2f;
+
         private void Update()
         {
             while (CombatLogFeed.TryDequeue(out var entry))
@@ -72,6 +77,8 @@ namespace CombatLog.Runtime
         private void OnGUI()
         {
             if (!CombatLogFeed.InGroundCombat)
+                return;
+            if (IsLoadingScreenActive())
                 return;
 
             EnsureStyles();
@@ -276,6 +283,27 @@ namespace CombatLog.Runtime
                 _collapsedLineStyle.font = gameFont;
                 _arrowStyle.font = gameFont;
             }
+        }
+
+        private bool IsLoadingScreenActive()
+        {
+            if (_loadingScreen == null)
+            {
+                if (Time.unscaledTime < _nextLoadingScreenLookupAt)
+                    return false;
+                _nextLoadingScreenLookupAt = Time.unscaledTime + LoadingScreenLookupCooldown;
+                foreach (var b in Resources.FindObjectsOfTypeAll<LoadingScreenBehavior>())
+                {
+                    if (b.gameObject.scene.IsValid())
+                    {
+                        _loadingScreen = b;
+                        break;
+                    }
+                }
+                if (_loadingScreen == null)
+                    return false;
+            }
+            return _loadingScreen.isActiveAndEnabled;
         }
 
         private static Texture2D MakeTex(Color c)
