@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using Xenonauts.Screens.LoadingScreen;
+using static CombatLog.ModConstants;
 
 namespace CombatLog.Runtime
 {
@@ -11,30 +12,29 @@ namespace CombatLog.Runtime
         // Hard cap on lines kept in memory.
         private const int MaxLines = 500;
 
-        // Layout. Anchored at the very bottom-left and kept narrow so it occupies the empty
-        // strip to the left of the throwable/weapon panels at common resolutions. The user can
-        // see longer lines in the expanded view.
-        private const float WidthFraction = 0.20f;
-        private const float MinWidth = 320f;
-        private const float MaxWidth = 380f;
-        private const float ExpandedHeightFraction = 0.14f;
-        private const float MinExpandedHeight = 100f;
-        private const float MaxExpandedHeight = 220f;
+        // Layout, anchored at the very top-right.
+        private const float WidthFraction = 0.26f;
+        private const float MinWidth = 420f;
+        private const float MaxWidth = 560f;
+        private const float ExpandedHeightFraction = 0.30f;
+        private const float MinExpandedHeight = 180f;
+        private const float MaxExpandedHeight = 360f;
         private const int CollapsedLines = 1;
         private const int LineHeight = 20;
         private const int FontSize = 13;
-        private const int ArrowFontSize = 18;
-        private const int ArrowButtonWidth = 26;
+        private const int ArrowFontSize = 14;
+        private const int ArrowButtonWidth = 22;
         private const int Border = 1;
         private const int Padding = 4;
-        private const int ScreenMargin = 8;
+        private const int ScreenMarginX = 20;
+        private const int ScreenMarginY = 20;
 
         private readonly List<CombatEntry> _entries = new();
         private bool _expanded;
         private Vector2 _scroll;
         private bool _followBottom = true;
 
-        private GUIStyle? _lineStyle;          // wraps; used in expanded view
+        private GUIStyle? _lineStyle; // wraps; used in expanded view
         private GUIStyle? _collapsedLineStyle; // single-line clipped; used in collapsed view
         private GUIStyle? _arrowStyle;
         private GUIStyle? _panelStyle;
@@ -52,7 +52,7 @@ namespace CombatLog.Runtime
             {
                 if (TryMergeIntoLast(entry))
                     continue;
-                _entries.Add(entry);
+                InsertNew(entry);
                 while (_entries.Count > MaxLines)
                     _entries.RemoveAt(0);
                 if (_followBottom)
@@ -60,18 +60,52 @@ namespace CombatLog.Runtime
             }
         }
 
+        // Place burst entries (shotgun pellets, burst fire rounds) sorted by BurstIndex.
+        private void InsertNew(CombatEntry entry)
+        {
+            if (entry.BurstKey == null)
+            {
+                _entries.Add(entry);
+                return;
+            }
+            var insertAt = _entries.Count;
+            var end = _entries.Count;
+            var start = Mathf.Max(0, end - MergeLookback);
+            for (var i = end - 1; i >= start; i--)
+            {
+                if (!ReferenceEquals(_entries[i].BurstKey, entry.BurstKey))
+                    continue;
+                if (_entries[i].BurstIndex > entry.BurstIndex)
+                    insertAt = i; // shift insertion before this larger-indexed sibling
+                else
+                    break; // siblings are non-decreasing by index from here back
+            }
+            if (insertAt == _entries.Count)
+                _entries.Add(entry);
+            else
+                _entries.Insert(insertAt, entry);
+        }
+
         // When mergeKey matches the most recent entry, the system has rebuilt the full text for
         // the same logical action (e.g. shot impact) - replace the previous text rather than
         // append, so each shot stays on a single line.
+        private const int MergeLookback = 16;
+
         private bool TryMergeIntoLast(CombatEntry incoming)
         {
             if (incoming.MergeKey == null || _entries.Count == 0)
                 return false;
-            var last = _entries[_entries.Count - 1];
-            if (!ReferenceEquals(last.MergeKey, incoming.MergeKey))
-                return false;
-            last.Text = incoming.Text;
-            return true;
+            var end = _entries.Count;
+            var start = Mathf.Max(0, end - MergeLookback);
+            for (var i = end - 1; i >= start; i--)
+            {
+                if (ReferenceEquals(_entries[i].MergeKey, incoming.MergeKey))
+                {
+                    _entries[i].Text = incoming.Text;
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void OnGUI()
@@ -87,7 +121,8 @@ namespace CombatLog.Runtime
             var screenH = Screen.height;
 
             var width = Mathf.Clamp(screenW * WidthFraction, MinWidth, MaxWidth);
-            var collapsedHeight = LineHeight * CollapsedLines + Padding * 2 + Border * 2;
+            var chromeHeight = Border * 2 + Padding * 2;
+            var collapsedHeight = LineHeight * CollapsedLines + chromeHeight;
             var expandedHeight = Mathf.Clamp(
                 screenH * ExpandedHeightFraction,
                 MinExpandedHeight,
@@ -95,13 +130,15 @@ namespace CombatLog.Runtime
             );
             var height = _expanded ? expandedHeight : collapsedHeight;
 
-            var x = ScreenMargin;
-            var y = screenH - height - ScreenMargin;
+            var x = screenW - width - ScreenMarginX;
+            var y = ScreenMarginY;
             var panel = new Rect(x, y, width, height);
             CombatLogState.LastPanelRect = panel;
 
             DrawPanelBackground(panel);
 
+            var contentTop = panel.y + Border + Padding;
+            var contentBottom = panel.yMax - Border - Padding;
             var arrowRect = new Rect(
                 panel.xMax - Border - ArrowButtonWidth,
                 panel.y + Border,
@@ -110,9 +147,9 @@ namespace CombatLog.Runtime
             );
             var contentRect = new Rect(
                 panel.x + Border + Padding,
-                panel.y + Border + Padding,
+                contentTop,
                 panel.width - Border * 2 - Padding * 2 - ArrowButtonWidth,
-                panel.height - Border * 2 - Padding * 2
+                contentBottom - contentTop
             );
 
             // Order matters: the arrow button and any scroll view inside the content draw
@@ -148,7 +185,7 @@ namespace CombatLog.Runtime
             if (_entries.Count == 0)
                 return;
             // Collapsed view shows only the most recent entry on a single clipped line. Long
-            // text gets cut off here on purpose; the expand button reveals the full content.
+            // text is cut off on purpose, the expand button reveals the full content.
             var last = _entries[_entries.Count - 1];
             GUI.Label(rect, last.Text, _collapsedLineStyle);
         }
@@ -190,7 +227,13 @@ namespace CombatLog.Runtime
 
         private void DrawArrowButton(Rect rect)
         {
-            var label = _expanded ? "▼" : "▲";
+            var label = _expanded ? "▲" : "▼";
+            var hover = rect.Contains(Event.current.mousePosition);
+            var color = hover ? Color.white : ParseHex(MetaColor, fallbackAlpha: 1f);
+            _arrowStyle!.normal.textColor = color;
+            _arrowStyle.hover.textColor = color;
+            _arrowStyle.active.textColor = color;
+            _arrowStyle.focused.textColor = color;
             if (GUI.Button(rect, label, _arrowStyle))
             {
                 _expanded = !_expanded;
@@ -225,8 +268,8 @@ namespace CombatLog.Runtime
             if (_lineStyle != null)
                 return;
 
-            _panelTex ??= MakeTex(new Color(0.05f, 0.05f, 0.05f, 0.72f));
-            _borderTex ??= MakeTex(new Color(0.45f, 0.45f, 0.45f, 1f));
+            _panelTex ??= MakeTex(new Color(0f, 0f, 0f, 0.88f));
+            _borderTex ??= MakeTex(ParseHex(PanelBorderColor, fallbackAlpha: 1f));
 
             Font? gameFont = null;
             try
@@ -267,12 +310,19 @@ namespace CombatLog.Runtime
                 margin = new RectOffset(0, 0, 0, 0),
                 border = new RectOffset(0, 0, 0, 0),
             };
+            var arrowIdle = ParseHex(MetaColor, fallbackAlpha: 1f);
+            var arrowHot = new Color(1f, 1f, 1f, 1f);
             _arrowStyle.normal.background = null;
-            _arrowStyle.hover.background = _borderTex;
-            _arrowStyle.active.background = _borderTex;
-            _arrowStyle.normal.textColor = textColor;
-            _arrowStyle.hover.textColor = textColor;
-            _arrowStyle.active.textColor = textColor;
+            _arrowStyle.hover.background = null;
+            _arrowStyle.active.background = null;
+            _arrowStyle.focused.background = null;
+            _arrowStyle.onNormal.background = null;
+            _arrowStyle.onHover.background = null;
+            _arrowStyle.onActive.background = null;
+            _arrowStyle.normal.textColor = arrowIdle;
+            _arrowStyle.hover.textColor = arrowHot;
+            _arrowStyle.active.textColor = arrowHot;
+            _arrowStyle.focused.textColor = arrowHot;
 
             _panelStyle = new GUIStyle();
             _panelStyle.normal.background = _panelTex;
@@ -313,6 +363,17 @@ namespace CombatLog.Runtime
             t.Apply();
             t.hideFlags = HideFlags.HideAndDontSave;
             return t;
+        }
+
+        private static Color ParseHex(string hex, float fallbackAlpha)
+        {
+            if (ColorUtility.TryParseHtmlString(hex, out var c))
+            {
+                if (c.a < 0.001f)
+                    c.a = fallbackAlpha;
+                return c;
+            }
+            return new Color(0.5f, 0.5f, 0.5f, fallbackAlpha);
         }
     }
 }

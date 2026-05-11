@@ -8,19 +8,28 @@ namespace CombatLog
     {
         public const string LogPrefix = "[CombatLog]";
 
-        public const string PlayerColor = "#7ed957";
-        public const string EnemyColor = "#ff6b6b";
-        public const string NeutralColor = "#c0c0c0";
-        public const string MetaColor = "#a0a0a0";
+        // Color values lifted directly from the game's UI prefabs (generated_prefab_common
+        // and generated_prefab_groundcombat):
+        //   text_header_blackui font color = #EAAD1C  (header yellow)
+        //   combatant_info_bar/hp value    = #EE1C25  (HP red, heart icon)
+        //   combatant_info_bar/armor value = #BEBEBE  (armour grey)
+        //   crosshair tu_cost_text         = #5CCB00  (TU green)
+        //   default text label             = #808080  (greys used for meta info)
+        public const string PlayerColor = "#E5E5E5";
+        public const string EnemyColor = "#EE6B6B";
+        public const string NeutralColor = "#C5C5C5";
+        public const string MetaColor = "#808080";
 
-        public const string AbilityHitColor = "#5cb85c";
-        public const string AbilityMissColor = "#888888";
+        public const string AbilityHitColor = "#5CCB00";
+        public const string AbilityMissColor = "#808080";
 
-        public const string BodyColor = "#d92e2e";
-        public const string ArmourColor = "#9c9c9c";
-        public const string StunColor = "#9b59b6";
+        public const string BodyColor = "#EE1C25";
+        public const string ArmourColor = "#BEBEBE";
+        public const string StunColor = "#7FBAB5";
 
-        public const string DeathColor = "#8e44ad";
+        public const string DeathColor = "#EAAD1C";
+
+        public const string PanelBorderColor = "#646464";
 
         public static readonly ILog Log = ArtitasLogger.GetLogger(
             MethodBase.GetCurrentMethod()!.DeclaringType

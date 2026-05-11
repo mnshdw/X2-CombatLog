@@ -29,6 +29,8 @@ namespace CombatLog.Runtime
             var target = ev.Target ?? conflict.Target;
             if (attacker == null || target == null)
                 return;
+            if (!ShouldShowCombatants(attacker, target))
+                return;
             var roll = ev.Projectile != null ? (int?)Math.Round(ev.Projectile.Roll) : null;
             // Per-shot chance = TrueChanceToHit * CalculateRecoilModifierForBurst(index).
             // Each shot in a burst rolls against its own degraded accuracy.
@@ -49,7 +51,16 @@ namespace CombatLog.Runtime
             var head = FormatHead(conflict, attacker, roll, chance, hit: hitTheTarget);
             var state = new ImpactState(target, head);
             _pending[ev] = state;
-            CombatLogFeed.Publish(new CombatEntry(EntryKind.Hit, BuildLine(state), mergeKey: ev));
+            var burstIndex = ev.Projectile?.IndexInBurst ?? 0;
+            CombatLogFeed.Publish(
+                new CombatEntry(
+                    EntryKind.Hit,
+                    BuildLine(state),
+                    mergeKey: ev,
+                    burstKey: conflict,
+                    burstIndex: burstIndex
+                )
+            );
         }
 
         [Subscriber]
@@ -62,12 +73,17 @@ namespace CombatLog.Runtime
             var target = conflict.Target;
             if (attacker == null || target == null)
                 return;
+            if (!ShouldShowCombatants(attacker, target))
+                return;
             var roll = ev!.Projectile != null ? (int?)Math.Round(ev.Projectile.Roll) : null;
             var chance = ev.Projectile != null ? (int?)Math.Round(ev.Projectile.Accuracy) : null;
+            var burstIndex = ev.Projectile?.IndexInBurst ?? 0;
             CombatLogFeed.Publish(
                 new CombatEntry(
                     EntryKind.Miss,
-                    FormatMissLine(conflict, attacker, target, roll, chance)
+                    FormatMissLine(conflict, attacker, target, roll, chance),
+                    burstKey: conflict,
+                    burstIndex: burstIndex
                 )
             );
         }
@@ -84,11 +100,15 @@ namespace CombatLog.Runtime
             var target = ev.Target ?? conflict.Target;
             if (attacker == null || target == null)
                 return;
+            if (!ShouldShowCombatants(attacker, target))
+                return;
             // Melee's d100 is local to MeleeAbility.HitTarget and not stored on the event.
             var head = FormatHead(conflict, attacker, roll: null, chance: null, hit: true);
             var state = new ImpactState(target, head);
             _pending[ev] = state;
-            CombatLogFeed.Publish(new CombatEntry(EntryKind.Hit, BuildLine(state), mergeKey: ev));
+            CombatLogFeed.Publish(
+                new CombatEntry(EntryKind.Hit, BuildLine(state), mergeKey: ev, burstKey: conflict)
+            );
         }
 
         [Subscriber]
@@ -101,10 +121,13 @@ namespace CombatLog.Runtime
             var target = conflict.Target;
             if (attacker == null || target == null)
                 return;
+            if (!ShouldShowCombatants(attacker, target))
+                return;
             CombatLogFeed.Publish(
                 new CombatEntry(
                     EntryKind.Miss,
-                    FormatMissLine(conflict, attacker, target, roll: null, chance: null)
+                    FormatMissLine(conflict, attacker, target, roll: null, chance: null),
+                    burstKey: conflict
                 )
             );
         }
@@ -170,14 +193,17 @@ namespace CombatLog.Runtime
 
                 if (!_pending.TryGetValue(impact, out var state))
                 {
-                    // Impact wasn't seen by us (rare; e.g. an impact type we don't subscribe to).
-                    // Synthesise a minimal state so we at least show the damage.
+                    // Impact wasn't seen by us, maybe it was suppressed by the visibility filter
+                    // or it's an impact type we don't subscribe to. Create a minimal state,
+                    // but only if the wearer/target is visible; otherwise don't show.
                     Entity? wearer =
                         stat == StatChangeReport.StatType.Armour
                         && ev.Conflict.IsSet
                         && ev.Conflict.Value.Target != null
                             ? ev.Conflict.Value.Target
                             : ev.Target;
+                    if (!IsVisibleNow(wearer))
+                        return;
                     state = new ImpactState(wearer, head: null);
                     _pending[impact] = state;
                 }
@@ -195,6 +221,8 @@ namespace CombatLog.Runtime
                 && ev.Conflict.Value.Target != null
                     ? ev.Conflict.Value.Target
                     : ev.Target;
+            if (!IsVisibleNow(standaloneTarget))
+                return;
             var single = new ImpactState(standaloneTarget, head: null);
             single.AddOrAccumulate(label, amount, color, sortOrder);
             CombatLogFeed.Publish(new CombatEntry(EntryKind.Damage, BuildLine(single)));
@@ -204,6 +232,8 @@ namespace CombatLog.Runtime
         public void OnDeath(CombatantDeathReport ev)
         {
             if (ev?.Actor == null)
+                return;
+            if (!IsVisibleNow(ev.Actor))
                 return;
             var color = ColorFor(ev.Actor);
             var line =
@@ -294,6 +324,31 @@ namespace CombatLog.Runtime
             catch
             {
                 return false;
+            }
+        }
+
+        private static bool ShouldShowCombatants(Entity? attacker, Entity? target)
+        {
+            return IsVisibleNow(attacker) || IsVisibleNow(target);
+        }
+
+        private static bool IsVisibleNow(Entity? entity)
+        {
+            if (entity == null)
+                return false;
+            {
+                if (entity.HasSightingState())
+                    return entity.SightingState().IsVisible();
+            }
+            catch { }
+            // Fall back to the per-player query if the entity has no SightingState yet.
+            try
+            {
+                return SightSystem.IsCombatantVisibleForAnyLocalPlayer(entity, currentOnly: true);
+            }
+            catch
+            {
+                return true;
             }
         }
 
