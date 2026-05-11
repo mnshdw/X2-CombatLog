@@ -137,6 +137,9 @@ namespace CombatLog.Runtime
         {
             if (ev?.Target == null)
                 return;
+            // Corpses still take stat changes from area effects (for example smoke grenade).
+            if (IsDead(ev.Target))
+                return;
             var stat = ev.Stat;
 
             if (
@@ -332,10 +335,25 @@ namespace CombatLog.Runtime
             return IsVisibleNow(attacker) || IsVisibleNow(target);
         }
 
+        private static bool IsDead(Entity? entity)
+        {
+            if (entity == null)
+                return false;
+            try
+            {
+                return entity.HasLifeStatus() && entity.LifeStatus().IsDead();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static bool IsVisibleNow(Entity? entity)
         {
             if (entity == null)
                 return false;
+            try
             {
                 if (entity.HasSightingState())
                     return entity.SightingState().IsVisible();
