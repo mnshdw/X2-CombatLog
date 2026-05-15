@@ -33,6 +33,7 @@ namespace CombatLog.Runtime
         private bool _expanded;
         private Vector2 _scroll;
         private bool _followBottom = true;
+        private bool _wasInGroundCombat;
 
         private GUIStyle? _lineStyle; // wraps; used in expanded view
         private GUIStyle? _collapsedLineStyle; // single-line clipped; used in collapsed view
@@ -48,6 +49,16 @@ namespace CombatLog.Runtime
 
         private void Update()
         {
+            // Host outlives the GroundCombat world (DontDestroyOnLoad), so on each new combat we
+            // need to clear the logs from the previous mission.
+            if (CombatLogFeed.InGroundCombat && !_wasInGroundCombat)
+            {
+                _entries.Clear();
+                _scroll = Vector2.zero;
+                _followBottom = true;
+            }
+            _wasInGroundCombat = CombatLogFeed.InGroundCombat;
+
             while (CombatLogFeed.TryDequeue(out var entry))
             {
                 if (TryMergeIntoLast(entry))

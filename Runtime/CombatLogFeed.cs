@@ -30,6 +30,8 @@ namespace CombatLog.Runtime
 
         public static void OnGroundCombatStarted()
         {
+            // Drop any entries left over from a previous combat so the new mission starts empty.
+            Pending.Clear();
             InGroundCombat = true;
         }
 
