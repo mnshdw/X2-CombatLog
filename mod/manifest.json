@@ -1,15 +1,24 @@
 {
-	"version": "0.0.4",
-	"asset": {
-		"Name": "Combat Log",
-		"UID": "b5a74702-a587-49e5-b527-e95e08e97a20",
-		"Description": "Adds a scrollable panel logging player and enemy actions and damage during ground combat.",
-		"Author": "mnshdw",
-		"Website": "",
-		"Tags": ["UI", "QoL"],
-		"Version": "0.2.0",
-		"MinimumVersion": "7.21.6",
-		"$type": "Common.Content.DataStructures.ContentPackManifest"
-	},
-	"$type": "Common.Content.DataStructures.VersionedAsset"
+    "version": "0.1.0",
+    "asset": {
+        "Source": "SteamWorkshop",
+        "UID": "3726627284",
+        "Name": "Combat Log",
+        "Description": "Adds a scrollable panel logging player and enemy actions and damage during ground combat.",
+        "Visiblity": "Public",
+        "Author": "mnshdw",
+        "Website": "https://github.com/mnshdw/X2-CombatLog",
+        "Credits": "mnshdw",
+        "Tags": [
+            "UI",
+            "QoL"
+        ],
+        "Dependencies": [],
+        "SupportedLanguages": [],
+        "Version": "0.2.0",
+        "MinimumVersion": "7.21.6",
+        "MaximumVersion": false,
+        "$t": "14"
+    },
+    "$t": "15"
 }
