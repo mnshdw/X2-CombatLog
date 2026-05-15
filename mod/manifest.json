@@ -7,7 +7,7 @@
 		"Author": "mnshdw",
 		"Website": "",
 		"Tags": ["UI", "QoL"],
-		"Version": "0.1.0",
+		"Version": "0.2.0",
 		"MinimumVersion": "7.21.6",
 		"$type": "Common.Content.DataStructures.ContentPackManifest"
 	},
